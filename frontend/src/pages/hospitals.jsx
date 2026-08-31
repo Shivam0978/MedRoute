@@ -1,11 +1,8 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { z } from "zod";
-import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import Fuse from "fuse.js";
-import { supabase } from "@/integrations/supabase/client";
-import { Search, MapPin, Star, Bed, Stethoscope, IndianRupee, GitCompare, Filter, Plus, Clock, Navigation, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Search, MapPin, Star, Bed, Stethoscope, IndianRupee, GitCompare, Filter, Plus, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Symptom → specialty hints. Fuzzy-matched so typos still route correctly ("chst pian" → cardiology).
@@ -20,73 +17,67 @@ const SYMPTOM_HINTS = {
   "tooth pain": ["Dental"], "gum bleeding": ["Dental"], "cavity": ["Dental"],
   "pregnancy": ["Gynaecology"], "delivery": ["Gynaecology"], "period pain": ["Gynaecology"],
   "ear pain": ["ENT"], "throat infection": ["ENT"], "hearing loss": ["ENT"],
-  "eye pain": ["Ophthalmology"], "blurry vision": ["Ophthalmology"], "cataract": ["Ophthalmology"]
+  "eye pain": ["Ophthalmology"], "blurry vision": ["Ophthalmology"], "cataract": ["Ophthalmology"],
 };
-
-const schema = z.object({
-  q: fallback(z.string(), "").default(""),
-  city: fallback(z.string(), "").default(""),
-  specialty: fallback(z.string(), "").default(""),
-  govt: fallback(z.boolean(), false).default(false),
-  emergency: fallback(z.boolean(), false).default(false)
-});
-
-export default HospitalsPage;
 
 const SPECIALTIES = ["Cardiology", "Neurology", "Orthopedics", "Pediatrics", "Dermatology", "Oncology", "General Medicine", "Dental"];
 const CITIES = ["Mumbai", "New Delhi", "Bengaluru", "Vellore", "Anand"];
 
-function HospitalsPage() {
-  const [searchParams] = useSearchParams();
-  const search = Object.fromEntries(searchParams.entries());
-  const nav = useNavigate({ from: "/hospitals" });
-  const [q, setQ] = useState(search.q);
-  useEffect(() => setQ(search.q), [search.q]);
+export default function HospitalsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQ = searchParams.get("q") || "";
+  const searchCity = searchParams.get("city") || "";
+  const searchSpecialty = searchParams.get("specialty") || "";
+  const searchGovt = searchParams.get("govt") === "true";
+  const searchEmergency = searchParams.get("emergency") === "true";
+
+  const [q, setQ] = useState(searchQ);
+  useEffect(() => setQ(searchQ), [searchQ]);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 12; // Adjusted for better grid layout
+  const PAGE_SIZE = 12;
 
   const [compare, setCompare] = useState([]);
-  const toggleCompare = (id) => setCompare((c) => c.includes(id) ? c.filter((x) => x !== id) : c.length < 3 ? [...c, id] : c);
+  const toggleCompare = (id) =>
+    setCompare((c) => (c.includes(id) ? c.filter((x) => x !== id) : c.length < 3 ? [...c, id] : c));
 
   const { data: hospitals = [], isLoading } = useQuery({
     queryKey: ["hospitals"],
     queryFn: async () => {
       const resp = await fetch("http://localhost:3001/api/hospitals");
-      if (!resp.ok) throw new Error("Failed");
-      const data = await resp.json();
-      return data;
-    }
+      if (!resp.ok) throw new Error("Failed to fetch hospitals");
+      return resp.json();
+    },
   });
 
   // Pre-filtered (city/specialty/flags) before fuzzy search
   const prefiltered = useMemo(() => {
     return hospitals.filter((h) => {
-      if (search.city && h.city !== search.city) return false;
-      if (search.specialty && !(h.specialties || []).some((s) => s.toLowerCase().includes(search.specialty.toLowerCase()))) return false;
-      if (search.govt && !h.is_government) return false;
-      if (search.emergency && !h.emergency_24x7) return false;
+      if (searchCity && h.city !== searchCity) return false;
+      if (searchSpecialty && !(h.specialties || []).some((s) => s.toLowerCase().includes(searchSpecialty.toLowerCase()))) return false;
+      if (searchGovt && !h.is_government) return false;
+      if (searchEmergency && !h.emergency_24x7) return false;
       return true;
     });
-  }, [hospitals, search.city, search.specialty, search.govt, search.emergency]);
+  }, [hospitals, searchCity, searchSpecialty, searchGovt, searchEmergency]);
 
   const fuse = useMemo(
     () =>
-    new Fuse(prefiltered, {
-      includeScore: true,
-      threshold: 0.4, // typo tolerance
-      ignoreLocation: true,
-      keys: [
-      { name: "name", weight: 0.5 },
-      { name: "city", weight: 0.25 },
-      { name: "address", weight: 0.1 },
-      { name: "specialties", weight: 0.4 }]
-
-    }),
+      new Fuse(prefiltered, {
+        includeScore: true,
+        threshold: 0.4, // typo tolerance
+        ignoreLocation: true,
+        keys: [
+          { name: "name", weight: 0.5 },
+          { name: "city", weight: 0.25 },
+          { name: "address", weight: 0.1 },
+          { name: "specialties", weight: 0.4 },
+        ],
+      }),
     [prefiltered]
   );
 
   const filtered = useMemo(() => {
-    const raw = (search.q || "").trim();
+    const raw = searchQ.trim();
     if (!raw) return prefiltered;
 
     // Symptom routing — fuzzy-match the query against known symptom phrases
@@ -98,20 +89,32 @@ function HospitalsPage() {
     if (hintedSpecs.length === 0) return direct;
 
     const specMatches = prefiltered.filter((h) =>
-    (h.specialties || []).some((s) => hintedSpecs.some((hs) => s.toLowerCase().includes(hs.toLowerCase())))
+      (h.specialties || []).some((s) => hintedSpecs.some((hs) => s.toLowerCase().includes(hs.toLowerCase())))
     );
     // Merge, dedupe, keep direct matches first
     const seen = new Set();
-    return [...direct, ...specMatches].filter((h) => seen.has(h.id) ? false : (seen.add(h.id), true));
-  }, [fuse, prefiltered, search.q]);
+    return [...direct, ...specMatches].filter((h) => (seen.has(h.id || h._id) ? false : (seen.add(h.id || h._id), true)));
+  }, [fuse, prefiltered, searchQ]);
 
   // Reset to page 1 whenever filters/query change
-  useEffect(() => {setPage(1);}, [search.q, search.city, search.specialty, search.govt, search.emergency]);
+  useEffect(() => {
+    setPage(1);
+  }, [searchQ, searchCity, searchSpecialty, searchGovt, searchEmergency]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const update = (patch) =>
-  nav({ search: (prev) => ({ ...prev, ...patch }) });
+  const update = (patch) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(patch).forEach(([k, v]) => {
+      if (v === "" || v === false || v === null || v === undefined) {
+        next.delete(k);
+      } else {
+        next.set(k, String(v));
+      }
+    });
+    setSearchParams(next);
+  };
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden pb-20">
@@ -126,173 +129,264 @@ function HospitalsPage() {
           </div>
           <div className="flex gap-3 animate-in fade-in slide-in-from-right-8 duration-700">
             <Link to="/submit-hospital">
-              <Button variant="outline" className="rounded-xl border-border/50 hover:bg-primary/10 hover:text-primary hover:border-primary/30 shadow-sm transition-all hover-lift"><Plus className="size-4.5 mr-2" />Add facility</Button>
+              <Button variant="outline" className="rounded-xl border-border/50 hover:bg-primary/10 hover:text-primary hover:border-primary/30 shadow-sm transition-all hover-lift">
+                <Plus className="size-4.5 mr-2" />Add facility
+              </Button>
             </Link>
-            {compare.length >= 2 &&
-            <Link to="/compare" search={{ ids: compare.join(",") }}>
-                <Button className="rounded-xl shadow-soft font-bold hover-lift animate-pulse-ring"><GitCompare className="size-4.5 mr-2" />Compare ({compare.length})</Button>
+            {compare.length >= 2 && (
+              <Link to={`/compare?ids=${compare.join(",")}`}>
+                <Button className="rounded-xl shadow-soft font-bold hover-lift animate-pulse-ring">
+                  <GitCompare className="size-4.5 mr-2" />Compare ({compare.length})
+                </Button>
               </Link>
-            }
+            )}
           </div>
         </div>
 
         <div className="glass-card rounded-3xl p-3 sm:p-5 shadow-soft mb-10 sticky top-24 z-30 animate-in fade-in slide-in-from-top-8 duration-700 delay-100 border border-border/50 backdrop-blur-xl">
-          <form onSubmit={(e) => {e.preventDefault();update({ q });}} className="flex flex-wrap lg:flex-nowrap gap-3 items-center">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              update({ q });
+            }}
+            className="flex flex-wrap lg:flex-nowrap gap-3 items-center"
+          >
             <div className="flex-1 w-full lg:min-w-[320px] flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-background border border-border/50 focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10 transition-all shadow-sm">
               <Search className="size-5 text-primary" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, symptom, or specialty..." className="flex-1 bg-transparent outline-none text-base font-medium placeholder:text-muted-foreground/60" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search by name, symptom, or specialty..."
+                className="flex-1 bg-transparent outline-none text-base font-medium placeholder:text-muted-foreground/60"
+              />
             </div>
-            
+
             <div className="w-full lg:w-auto grid grid-cols-2 sm:grid-cols-4 gap-3 lg:flex lg:gap-3">
-              <select value={search.city} onChange={(e) => update({ city: e.target.value })} className="px-4 py-3.5 rounded-2xl bg-background border border-border/50 text-sm font-medium focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer shadow-sm">
+              <select
+                value={searchCity}
+                onChange={(e) => update({ city: e.target.value })}
+                className="px-4 py-3.5 rounded-2xl bg-background border border-border/50 text-sm font-medium focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer shadow-sm"
+              >
                 <option value="">All Cities</option>
-                {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {CITIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
-              <select value={search.specialty} onChange={(e) => update({ specialty: e.target.value })} className="px-4 py-3.5 rounded-2xl bg-background border border-border/50 text-sm font-medium focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer shadow-sm">
+              <select
+                value={searchSpecialty}
+                onChange={(e) => update({ specialty: e.target.value })}
+                className="px-4 py-3.5 rounded-2xl bg-background border border-border/50 text-sm font-medium focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer shadow-sm"
+              >
                 <option value="">All Specialties</option>
-                {SPECIALTIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {SPECIALTIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
               <label className="flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-2xl bg-background border border-border/50 cursor-pointer hover:bg-primary/5 transition-colors shadow-sm select-none">
-                <input type="checkbox" className="rounded text-primary focus:ring-primary accent-primary size-4" checked={search.govt} onChange={(e) => update({ govt: e.target.checked })} /> Govt
+                <input
+                  type="checkbox"
+                  className="rounded text-primary focus:ring-primary accent-primary size-4"
+                  checked={searchGovt}
+                  onChange={(e) => update({ govt: e.target.checked })}
+                />{" "}
+                Govt
               </label>
               <label className="flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-2xl bg-background border border-border/50 cursor-pointer hover:bg-emergency/5 transition-colors shadow-sm select-none">
-                <input type="checkbox" className="rounded text-emergency focus:ring-emergency accent-emergency size-4" checked={search.emergency} onChange={(e) => update({ emergency: e.target.checked })} /> 24×7 ER
+                <input
+                  type="checkbox"
+                  className="rounded text-emergency focus:ring-emergency accent-emergency size-4"
+                  checked={searchEmergency}
+                  onChange={(e) => update({ emergency: e.target.checked })}
+                />{" "}
+                24×7 ER
               </label>
             </div>
-            <Button type="submit" size="lg" className="w-full lg:w-auto rounded-2xl shadow-soft font-bold text-base px-8 py-6 hover-lift hidden sm:flex"><Filter className="size-5 mr-2" />Apply Filters</Button>
+
+            <Button type="submit" size="lg" className="w-full lg:w-auto rounded-2xl px-8 font-bold shadow-soft hover-lift h-13">
+              <Filter className="size-4.5 mr-2" />
+              Apply
+            </Button>
           </form>
         </div>
 
-        {isLoading ?
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) =>
-          <div key={i} className="h-[380px] rounded-3xl bg-muted/40 animate-pulse border border-border/30" />
-          )}
-          </div> :
-        filtered.length === 0 ?
-        <div className="p-16 text-center glass-card rounded-3xl border border-border/50 flex flex-col items-center justify-center min-h-[400px]">
-            <Search className="size-16 text-muted-foreground/30 mb-6" />
-            <h3 className="text-2xl font-bold mb-2">No hospitals found</h3>
-            <p className="text-muted-foreground text-lg">We couldn't find any facilities matching your current filters.</p>
-            <Button onClick={() => update({ q: "", city: "", specialty: "", govt: false, emergency: false })} variant="outline" className="mt-6 rounded-xl">Clear all filters</Button>
-          </div> :
-
-        <div className="animate-in fade-in duration-1000">
-            <div className="mb-6 text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-              <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} facilities</span>
-              {search.q && <span className="bg-primary/10 text-primary px-3 py-1 rounded-full normal-case tracking-normal">Results for "{search.q}"</span>}
+        {isLoading ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-96 rounded-3xl bg-muted/60 animate-pulse border border-border/40" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-16 text-center glass-card rounded-3xl border border-border/50 max-w-xl mx-auto shadow-soft">
+            <div className="size-16 rounded-2xl bg-muted grid place-items-center mx-auto mb-4 text-muted-foreground">
+              <Search className="size-8" />
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {pageItems.map((h, index) => {
-              const beds = Array.isArray(h.beds) ? h.beds[0] : h.beds;
-              const checked = compare.includes(h.id);
-              return (
-                <article key={h.id} className="relative flex flex-col p-6 rounded-3xl bg-card border border-border/50 hover:border-primary/40 shadow-sm hover:shadow-soft transition-all duration-300 hover-lift group animate-in fade-in zoom-in-95" style={{ animationDelay: `${index * 50}ms` }}>
-                    
-                    {checked && <div className="absolute inset-0 border-2 border-primary rounded-3xl pointer-events-none" />}
+            <h3 className="text-xl font-bold mb-2">No facilities match your search</h3>
+            <p className="text-muted-foreground text-sm mb-6">Try clearing some filters or searching for broader symptoms.</p>
+            <Button variant="outline" onClick={() => update({ q: "", city: "", specialty: "", govt: false, emergency: false })}>
+              Reset all filters
+            </Button>
+          </div>
+        ) : (
+          <div>
+            <div className="mb-6 text-sm font-semibold text-muted-foreground flex items-center justify-between">
+              <span>
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} facilities
+              </span>
+            </div>
 
-                    <div className="flex items-start justify-between gap-4 mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          {h.is_government && <ShieldCheck className="size-4 text-primary" />}
-                          <h3 className="font-display font-extrabold text-xl sm:text-2xl line-clamp-1 group-hover:text-primary transition-colors">{h.name}</h3>
-                        </div>
-                        <div className="text-sm text-muted-foreground font-medium flex items-start gap-1.5 mt-2">
-                          <MapPin className="size-4 shrink-0 mt-0.5 text-primary/70" />
-                          <span className="line-clamp-2">{h.address}, {h.city}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end shrink-0">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-warning/15 text-warning-foreground text-sm font-bold border border-warning/20 shadow-sm">
-                          <Star className="size-4 fill-current" /> {Number(h.rating).toFixed(1)}
-                        </div>
-                        <div className="mt-2 text-xs font-bold text-muted-foreground inline-flex items-center bg-muted/50 px-2 py-1 rounded-lg">
-                          <IndianRupee className="size-3" /> Cost {h.cost_tier}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 mb-5">
-                      {h.emergency_24x7 && <Tag tone="emergency"><AlertTriangle className="size-3 mr-1" /> 24×7 ER</Tag>}
-                      {h.has_icu && <Tag tone="primary">ICU Equipped</Tag>}
-                      {h.has_ambulance && <Tag tone="success">Ambulance</Tag>}
-                      {h.ayushman && <Tag tone="primary">Ayushman Bharat</Tag>}
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 mb-6">
-                      {(h.specialties || []).slice(0, 5).map((s) =>
-                    <span key={s} className="text-xs px-2.5 py-1 rounded-lg bg-muted text-muted-foreground font-medium border border-border/50">{s}</span>
-                    )}
-                      {h.specialties?.length > 5 && <span className="text-xs px-2.5 py-1 rounded-lg bg-muted text-muted-foreground font-medium border border-border/50">+{h.specialties.length - 5} more</span>}
-                    </div>
-
-                    <div className="mt-auto">
-                      {beds ?
-                    <div className="mb-5 grid grid-cols-4 gap-2 text-center">
-                          <BedStat label="ICU Beds" v={beds.icu_available} total={beds.icu_total} />
-                          <BedStat label="Oxygen" v={beds.oxygen_available} total={beds.oxygen_total} />
-                          <BedStat label="ER Beds" v={beds.emergency_available} total={beds.emergency_total} />
-                          <BedStat label="General" v={beds.general_available} total={beds.general_total} />
-                        </div> :
-
-                    <div className="mb-5 p-4 rounded-xl bg-muted/30 border border-border/50 text-center text-sm font-medium text-muted-foreground">
-                          Bed availability data not currently synced.
-                        </div>
-                    }
-
-                      <div className="flex items-center justify-between pt-5 border-t border-border/50">
-                        <label className="flex items-center gap-2.5 text-sm font-bold text-muted-foreground cursor-pointer group/label">
-                          <div className={`size-5 rounded border flex items-center justify-center transition-colors ${checked ? 'bg-primary border-primary' : 'border-muted-foreground/40 group-hover/label:border-primary/50'}`}>
-                            {checked && <GitCompare className="size-3 text-primary-foreground" />}
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {pageItems.map((h) => {
+                const beds = Array.isArray(h.beds) ? h.beds[0] : h.beds;
+                const hId = h.id || h._id;
+                const checked = compare.includes(hId);
+                return (
+                  <article
+                    key={hId}
+                    className="group relative rounded-3xl bg-card border border-border/60 hover:border-primary/50 shadow-sm hover:shadow-soft transition-all duration-300 flex flex-col justify-between overflow-hidden hover-lift"
+                  >
+                    <div className="p-6">
+                      <div className="flex items-start justify-between gap-4 mb-3">
+                        <div>
+                          <h3 className="font-display font-bold text-xl group-hover:text-primary transition-colors leading-tight">{h.name}</h3>
+                          <div className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mt-1.5">
+                            <MapPin className="size-4 text-primary shrink-0" />
+                            <span>{h.city} · {h.address}</span>
                           </div>
-                          <input type="checkbox" className="sr-only" checked={checked} onChange={() => toggleCompare(h.id)} /> 
+                        </div>
+                        <div className="flex flex-col items-end shrink-0">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-warning/15 text-warning-foreground text-sm font-extrabold shadow-sm">
+                            <Star className="size-4 fill-current text-amber-500" />
+                            {Number(h.rating).toFixed(1)}
+                          </div>
+                          <span className="text-[11px] font-bold text-muted-foreground mt-1 tracking-wider uppercase inline-flex items-center">
+                            <IndianRupee className="size-3" />{h.cost_tier}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 mt-4">
+                        {h.emergency_24x7 && <Tag tone="emergency">24×7 ER</Tag>}
+                        {h.has_icu && <Tag>ICU</Tag>}
+                        {h.has_mri && <Tag>MRI</Tag>}
+                        {h.has_ambulance && <Tag>Ambulance</Tag>}
+                        {h.is_government && <Tag tone="primary">Govt</Tag>}
+                        {h.ayushman && <Tag tone="success">Ayushman</Tag>}
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 mt-4">
+                        {(h.specialties || []).slice(0, 4).map((s) => (
+                          <span key={s} className="text-xs px-2.5 py-1 rounded-xl bg-muted font-medium text-muted-foreground">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+
+                      {beds && (
+                        <div className="mt-5 grid grid-cols-4 gap-2 bg-muted/40 p-3 rounded-2xl border border-border/40">
+                          <BedStat label="ICU" v={beds.icu_available ?? 0} />
+                          <BedStat label="Oxygen" v={beds.oxygen_available ?? 0} />
+                          <BedStat label="Emergency" v={beds.emergency_available ?? 0} />
+                          <BedStat label="General" v={beds.general_available ?? 0} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-6 pt-0">
+                      <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                        <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded text-primary focus:ring-primary accent-primary size-4"
+                            checked={checked}
+                            onChange={() => toggleCompare(hId)}
+                          />
                           Compare
                         </label>
-                        <div className="flex gap-2.5">
-                          <Link to="/doctors" search={{ hospital: h.id }}>
-                            <Button variant="outline" size="sm" className="rounded-xl border-border/50 font-bold hover:bg-primary/5 hover:text-primary"><Stethoscope className="size-4 mr-1.5" />Doctors</Button>
+                        <div className="flex gap-2">
+                          <Link to={`/doctors?hospital=${hId}`}>
+                            <Button variant="outline" size="sm" className="rounded-xl font-bold">
+                              <Stethoscope className="size-4 mr-1" />
+                              Doctors
+                            </Button>
                           </Link>
-                          <a href={`https://www.google.com/maps/search/${encodeURIComponent(h.name + " " + h.city)}`} target="_blank" rel="noreferrer">
-                            <Button size="sm" className="rounded-xl font-bold shadow-soft bg-foreground hover:bg-foreground/90 text-background"><Navigation className="size-4 mr-1.5" />Route</Button>
+                          <a
+                            href={`https://www.google.com/maps/search/${encodeURIComponent(h.name + " " + h.city)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Button size="sm" className="rounded-xl font-bold">
+                              <Navigation className="size-4 mr-1" />
+                              Directions
+                            </Button>
                           </a>
                         </div>
                       </div>
                     </div>
-                  </article>);
-
-            })}
+                  </article>
+                );
+              })}
             </div>
 
-            {totalPages > 1 &&
-          <div className="flex items-center justify-center gap-4 mt-12 mb-6">
-                <Button variant="outline" size="lg" className="rounded-xl font-bold" disabled={page === 1} onClick={() => {setPage((p) => Math.max(1, p - 1));window.scrollTo({ top: 0, behavior: 'smooth' });}}>Previous</Button>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-4 mt-12 mb-6">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="rounded-xl font-bold"
+                  disabled={page === 1}
+                  onClick={() => {
+                    setPage((p) => Math.max(1, p - 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  Previous
+                </Button>
                 <div className="bg-card border border-border/50 px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm">
                   Page {page} of {totalPages}
                 </div>
-                <Button variant="outline" size="lg" className="rounded-xl font-bold" disabled={page === totalPages} onClick={() => {setPage((p) => Math.min(totalPages, p + 1));window.scrollTo({ top: 0, behavior: 'smooth' });}}>Next Page</Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="rounded-xl font-bold"
+                  disabled={page === totalPages}
+                  onClick={() => {
+                    setPage((p) => Math.min(totalPages, p + 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  Next Page
+                </Button>
               </div>
-          }
+            )}
           </div>
-        }
+        )}
       </div>
-    </div>);
-
+    </div>
+  );
 }
 
 function Tag({ children, tone = "default" }) {
-  const cls = tone === "emergency" ? "bg-emergency/15 text-emergency border-emergency/20" : tone === "success" ? "bg-success/15 text-success border-success/20" : tone === "primary" ? "bg-primary/15 text-primary border-primary/20" : "bg-muted text-muted-foreground border-border/50";
+  const cls =
+    tone === "emergency"
+      ? "bg-emergency/15 text-emergency border-emergency/20"
+      : tone === "success"
+      ? "bg-success/15 text-success border-success/20"
+      : tone === "primary"
+      ? "bg-primary/15 text-primary border-primary/20"
+      : "bg-muted text-muted-foreground border-border/50";
   return <span className={`text-xs px-2.5 py-1 rounded-full font-bold border flex items-center shadow-sm ${cls}`}>{children}</span>;
 }
 
-function BedStat({ label, v, total }) {
+function BedStat({ label, v }) {
   const tone = v > 10 ? "text-success" : v > 2 ? "text-warning-foreground" : "text-emergency";
-  const bg = v > 10 ? "bg-success/5 border-success/10" : v > 2 ? "bg-warning/5 border-warning/10" : "bg-emergency/5 border-emergency/10";
   return (
-    <div className={`p-2.5 rounded-xl border flex flex-col items-center justify-center shadow-sm ${bg}`}>
-      <div className={`text-xl font-extrabold ${tone} leading-none mb-1`}>{v}</div>
-      {total !== undefined && <div className="text-[10px] font-semibold text-muted-foreground mb-0.5">/ {total}</div>}
-      <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide text-center leading-tight">{label}</div>
-    </div>);
-
+    <div className="p-2 rounded-xl bg-background border border-border/40 flex flex-col items-center justify-center shadow-sm">
+      <div className={`text-base font-extrabold ${tone} leading-none mb-1`}>{v}</div>
+      <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{label}</div>
+    </div>
+  );
 }

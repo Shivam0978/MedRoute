@@ -1,30 +1,23 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { MapPin, Navigation, Loader2, StopCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { distanceKm, formatKm } from "@/lib/distance";
 import { useGeolocation, mapsLink, directionsLink } from "@/hooks/use-geolocation";
 import { HospitalsMap } from "@/components/HospitalsMap";
 import { Button } from "@/components/ui/button";
 
-export default NearbyPage;
-
-function NearbyPage() {
+export default function NearbyPage() {
   const { coords, error: geoErr, loading: locating, watching, locate, startWatch, stopWatch } = useGeolocation();
   const user = coords ? [coords.lat, coords.lng] : null;
 
   const { data: hospitals = [], isLoading } = useQuery({
     queryKey: ["hospitals-with-coords"],
     queryFn: async () => {
-      const { data, error } = await supabase.
-      from("hospitals").
-      select("id,name,city,address,phone,lat,lng,emergency_24x7,rating,specialties").
-      not("lat", "is", null).
-      not("lng", "is", null);
-      if (error) throw error;
-      return data;
-    }
+      const res = await fetch("http://localhost:3001/api/hospitals");
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data || []).filter((h) => h.lat != null && h.lng != null);
+    },
   });
 
   const enriched = useMemo(() => {
@@ -37,13 +30,13 @@ function NearbyPage() {
   }, [hospitals, user]);
 
   const pins = enriched.slice(0, 50).map((h) => ({
-    id: h.id,
+    id: h.id || h._id,
     name: h.name,
     city: h.city,
     lat: Number(h.lat),
     lng: Number(h.lng),
     distanceKm: h.distanceKm,
-    emergency_24x7: h.emergency_24x7
+    emergency_24x7: h.emergency_24x7,
   }));
 
   return (
@@ -61,22 +54,29 @@ function NearbyPage() {
             {locating ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Navigation className="size-4 mr-2" />}
             {coords ? "Recenter on me" : "Use my location"}
           </Button>
-          {coords && (watching ?
-          <Button variant="outline" onClick={stopWatch}><StopCircle className="size-4 mr-2" />Stop live tracking</Button> :
-
-          <Button variant="outline" onClick={startWatch}><Navigation className="size-4 mr-2" />Live tracking</Button>)
-          }
+          {coords &&
+            (watching ? (
+              <Button variant="outline" onClick={stopWatch}>
+                <StopCircle className="size-4 mr-2" />
+                Stop live tracking
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={startWatch}>
+                <Navigation className="size-4 mr-2" />
+                Live tracking
+              </Button>
+            ))}
         </div>
       </div>
 
-      {geoErr &&
-      <div className="mb-4 text-sm p-3 rounded-lg bg-warning/15 text-warning-foreground">
+      {geoErr && (
+        <div className="mb-4 text-sm p-3 rounded-lg bg-warning/15 text-warning-foreground">
           {geoErr} The map still shows all hospitals — you can pan and zoom freely.
         </div>
-      }
+      )}
 
-      {coords &&
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm p-3 rounded-lg bg-muted">
+      {coords && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm p-3 rounded-lg bg-muted">
           <span className="font-mono">
             Latitude: {coords.lat.toFixed(6)} · Longitude: {coords.lng.toFixed(6)}
           </span>
@@ -85,17 +85,16 @@ function NearbyPage() {
             Open my location in Google Maps
           </a>
         </div>
-      }
+      )}
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-4">
-        {isLoading ?
-        <div className="h-[460px] rounded-2xl bg-muted animate-pulse" /> :
+        {isLoading ? (
+          <div className="h-[460px] rounded-2xl bg-muted animate-pulse" />
+        ) : (
+          <HospitalsMap user={user} pins={pins} />
+        )}
 
-        <HospitalsMap user={user} pins={pins} />
-        }
-
-
-        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-soft">
           <div className="px-4 py-3 border-b border-border">
             <div className="font-semibold">Closest hospitals</div>
             <div className="text-xs text-muted-foreground">
@@ -103,42 +102,42 @@ function NearbyPage() {
             </div>
           </div>
           <ul className="divide-y divide-border max-h-[420px] overflow-y-auto">
-            {enriched.slice(0, 25).map((h) =>
-            <li key={h.id} className="p-4 hover:bg-muted/50 transition">
+            {enriched.slice(0, 25).map((h) => (
+              <li key={h.id || h._id} className="p-4 hover:bg-muted/50 transition">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-medium leading-tight">{h.name}</div>
                     <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <MapPin className="size-3" />
+                      <MapPin className="size-3 text-primary" />
                       {h.city}
                     </div>
                   </div>
-                  {h.distanceKm !== undefined &&
-                <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold whitespace-nowrap">
+                  {h.distanceKm !== undefined && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold whitespace-nowrap">
                       {formatKm(h.distanceKm)}
                     </span>
-                }
+                  )}
                 </div>
                 <div className="mt-2 flex gap-2">
                   <a
-                  className="text-xs text-primary underline"
-                  href={directionsLink(Number(h.lat), Number(h.lng), coords)}
-                  target="_blank"
-                  rel="noreferrer">
-                  
+                    className="text-xs text-primary underline"
+                    href={directionsLink(Number(h.lat), Number(h.lng), coords)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Directions
                   </a>
-                  {h.phone &&
-                <a className="text-xs text-muted-foreground underline" href={`tel:${h.phone}`}>
+                  {h.phone && (
+                    <a className="text-xs text-muted-foreground underline" href={`tel:${h.phone}`}>
                       Call
                     </a>
-                }
+                  )}
                 </div>
               </li>
-            )}
+            ))}
           </ul>
         </div>
       </div>
-    </div>);
-
+    </div>
+  );
 }

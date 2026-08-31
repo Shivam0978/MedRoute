@@ -2,13 +2,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { z } from "zod";
 import { Building2, Send, ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-
-export default SubmitPage;
 
 const SPECIALTIES = ["Cardiology", "Neurology", "Orthopedics", "Pediatrics", "Dermatology", "Oncology", "General Medicine", "Dental", "Gynaecology", "ENT", "Ophthalmology"];
 
@@ -17,26 +14,34 @@ const schema = z.object({
   city: z.string().trim().min(2).max(100),
   address: z.string().trim().max(500).optional().or(z.literal("")),
   phone: z.string().trim().max(50).optional().or(z.literal("")),
-  notes: z.string().trim().max(1000).optional().or(z.literal(""))
+  notes: z.string().trim().max(1000).optional().or(z.literal("")),
 });
 
-function SubmitPage() {
-  const { user } = useAuth();
+export default function SubmitPage() {
+  const { user, token } = useAuth();
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
-    name: "", city: "", address: "", phone: "", notes: "",
+    name: "",
+    city: "",
+    address: "",
+    phone: "",
+    notes: "",
     specialties: [],
-    emergency_24x7: false, has_icu: false, has_mri: false, has_ambulance: false,
-    is_government: false, ayushman: false,
-    lat: "", lng: ""
+    emergency_24x7: false,
+    has_icu: false,
+    has_mri: false,
+    has_ambulance: false,
+    is_government: false,
+    ayushman: false,
+    lat: "",
+    lng: "",
   });
 
-  const setF = (k, v) =>
-  setForm((p) => ({ ...p, [k]: v }));
+  const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const toggleSpec = (s) =>
-  setF("specialties", form.specialties.includes(s) ? form.specialties.filter((x) => x !== s) : [...form.specialties, s]);
+    setF("specialties", form.specialties.includes(s) ? form.specialties.filter((x) => x !== s) : [...form.specialties, s]);
 
   const useMyLocation = () => {
     if (!navigator.geolocation) return toast.error("Geolocation not available");
@@ -54,7 +59,7 @@ function SubmitPage() {
     e.preventDefault();
     if (!user) {
       toast.error("Please sign in first");
-      return nav({ to: "/login" });
+      return nav("/login");
     }
     const parsed = schema.safeParse(form);
     if (!parsed.success) {
@@ -62,34 +67,54 @@ function SubmitPage() {
       return;
     }
     setBusy(true);
-    const { error } = await supabase.from("pending_hospitals").insert({
-      submitted_by: user.id,
-      submitter_email: user.email,
-      name: form.name.trim(),
-      city: form.city.trim(),
-      address: form.address.trim() || null,
-      phone: form.phone.trim() || null,
-      specialties: form.specialties,
-      emergency_24x7: form.emergency_24x7,
-      has_icu: form.has_icu,
-      has_mri: form.has_mri,
-      has_ambulance: form.has_ambulance,
-      is_government: form.is_government,
-      ayushman: form.ayushman,
-      lat: form.lat ? Number(form.lat) : null,
-      lng: form.lng ? Number(form.lng) : null,
-      notes: form.notes.trim() || null
-    });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success("Submitted! Admin will review it shortly.");
-    nav({ to: "/" });
+    try {
+      const authToken = token || localStorage.getItem("mr-token");
+      const res = await fetch("http://localhost:3001/api/pending-hospitals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          submitted_by: user.id || user._id,
+          submitter_email: user.email,
+          name: form.name.trim(),
+          city: form.city.trim(),
+          address: form.address.trim() || null,
+          phone: form.phone.trim() || null,
+          specialties: form.specialties,
+          emergency_24x7: form.emergency_24x7,
+          has_icu: form.has_icu,
+          has_mri: form.has_mri,
+          has_ambulance: form.has_ambulance,
+          is_government: form.is_government,
+          ayushman: form.ayushman,
+          lat: form.lat ? Number(form.lat) : null,
+          lng: form.lng ? Number(form.lng) : null,
+          notes: form.notes.trim() || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Submission failed");
+      }
+
+      toast.success("Submitted! Admin will review it shortly.");
+      nav("/");
+    } catch (err) {
+      toast.error(err.message || "Failed to submit");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
       <div className="flex items-center gap-3 mb-2">
-        <div className="size-12 rounded-2xl gradient-primary grid place-items-center text-primary-foreground"><Building2 className="size-6" /></div>
+        <div className="size-12 rounded-2xl gradient-primary grid place-items-center text-primary-foreground">
+          <Building2 className="size-6" />
+        </div>
         <div>
           <h1 className="font-display text-3xl font-bold">Add a hospital</h1>
           <p className="text-muted-foreground text-sm">Submit a hospital we don't list yet. The admin verifies submissions before they appear.</p>
@@ -101,7 +126,7 @@ function SubmitPage() {
         <span>Submissions are stored for admin review. Please share accurate, public information only.</span>
       </div>
 
-      <form onSubmit={submit} className="mt-6 space-y-5 bg-card border border-border rounded-2xl p-5">
+      <form onSubmit={submit} className="mt-6 space-y-5 bg-card border border-border rounded-2xl p-5 shadow-soft">
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Hospital name *">
             <input className="ipt" required value={form.name} onChange={(e) => setF("name", e.target.value)} />
@@ -114,11 +139,19 @@ function SubmitPage() {
           <input className="ipt" value={form.address} onChange={(e) => setF("address", e.target.value)} />
         </Field>
         <div className="grid sm:grid-cols-3 gap-3">
-          <Field label="Phone"><input className="ipt" value={form.phone} onChange={(e) => setF("phone", e.target.value)} /></Field>
-          <Field label="Latitude"><input className="ipt" inputMode="decimal" value={form.lat} onChange={(e) => setF("lat", e.target.value)} /></Field>
-          <Field label="Longitude"><input className="ipt" inputMode="decimal" value={form.lng} onChange={(e) => setF("lng", e.target.value)} /></Field>
+          <Field label="Phone">
+            <input className="ipt" value={form.phone} onChange={(e) => setF("phone", e.target.value)} />
+          </Field>
+          <Field label="Latitude">
+            <input className="ipt" inputMode="decimal" value={form.lat} onChange={(e) => setF("lat", e.target.value)} />
+          </Field>
+          <Field label="Longitude">
+            <input className="ipt" inputMode="decimal" value={form.lng} onChange={(e) => setF("lng", e.target.value)} />
+          </Field>
         </div>
-        <button type="button" onClick={useMyLocation} className="text-xs text-primary underline">Use my current location</button>
+        <button type="button" onClick={useMyLocation} className="text-xs text-primary underline">
+          Use my current location
+        </button>
 
         <div>
           <div className="text-sm font-medium mb-2">Specialties</div>
@@ -126,29 +159,35 @@ function SubmitPage() {
             {SPECIALTIES.map((s) => {
               const active = form.specialties.includes(s);
               return (
-                <button type="button" key={s} onClick={() => toggleSpec(s)}
-                className={`px-3 py-1.5 rounded-full text-xs border transition ${active ? "bg-primary text-primary-foreground border-primary" : "border-border bg-muted hover:bg-card text-muted-foreground"}`}>
+                <button
+                  type="button"
+                  key={s}
+                  onClick={() => toggleSpec(s)}
+                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                    active ? "bg-primary text-primary-foreground border-primary" : "border-border bg-muted hover:bg-card text-muted-foreground"
+                  }`}
+                >
                   {s}
-                </button>);
-
+                </button>
+              );
             })}
           </div>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-2 text-sm">
           {[
-          ["emergency_24x7", "24×7 Emergency"],
-          ["has_icu", "ICU"],
-          ["has_mri", "MRI"],
-          ["has_ambulance", "Ambulance"],
-          ["is_government", "Government"],
-          ["ayushman", "Ayushman Bharat"]].
-          map(([k, label]) =>
-          <label key={k} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
+            ["emergency_24x7", "24×7 Emergency"],
+            ["has_icu", "ICU"],
+            ["has_mri", "MRI"],
+            ["has_ambulance", "Ambulance"],
+            ["is_government", "Government"],
+            ["ayushman", "Ayushman Bharat"],
+          ].map(([k, label]) => (
+            <label key={k} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted cursor-pointer">
               <input type="checkbox" checked={form[k]} onChange={(e) => setF(k, e.target.checked)} />
               {label}
             </label>
-          )}
+          ))}
         </div>
 
         <Field label="Notes (optional)">
@@ -156,14 +195,19 @@ function SubmitPage() {
         </Field>
 
         <div className="flex items-center gap-2">
-          <Button type="submit" disabled={busy}><Send className="size-4 mr-2" />{busy ? "Submitting…" : "Submit for review"}</Button>
-          <Link to="/" className="text-sm text-muted-foreground underline">Cancel</Link>
+          <Button type="submit" disabled={busy}>
+            <Send className="size-4 mr-2" />
+            {busy ? "Submitting…" : "Submit for review"}
+          </Button>
+          <Link to="/" className="text-sm text-muted-foreground underline">
+            Cancel
+          </Link>
         </div>
       </form>
 
       <style>{`.ipt{display:block;width:100%;padding:.5rem .75rem;border-radius:.5rem;background:var(--muted);border:1px solid transparent;font-size:.875rem;outline:none}.ipt:focus{border-color:color-mix(in oklab,var(--primary) 50%,transparent)}`}</style>
-    </div>);
-
+    </div>
+  );
 }
 
 function Field({ label, children }) {
@@ -171,6 +215,6 @@ function Field({ label, children }) {
     <label className="block">
       <div className="text-sm font-medium mb-1">{label}</div>
       {children}
-    </label>);
-
+    </label>
+  );
 }

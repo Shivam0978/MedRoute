@@ -2,40 +2,78 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  Shield, CheckCircle2, XCircle, MailOpen, Mail, Building2, Stethoscope, Layers, Wrench, BarChart3, Plus, Trash2, Pencil, Save, X } from
-"lucide-react";
+  Shield,
+  CheckCircle2,
+  XCircle,
+  MailOpen,
+  Mail,
+  Building2,
+  Stethoscope,
+  Layers,
+  Wrench,
+  BarChart3,
+  Plus,
+  Trash2,
+  Pencil,
+  Save,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  adminAnalytics, adminCheckSelf,
-  adminListPending, adminApproveHospital, adminRejectHospital,
-  adminListMessages, adminResolveMessage,
-  adminListDoctors, adminCreateDoctor, adminUpdateDoctor, adminDeleteDoctor,
-  adminCreateHospital, adminUpdateHospital, adminDeleteHospital,
-  adminListDepartments, adminCreateDepartment, adminDeleteDepartment,
-  adminListFacilities, adminCreateFacility, adminDeleteFacility } from
-"@/lib/admin.functions";
+  adminAnalytics,
+  adminCheckSelf,
+  adminListPending,
+  adminApproveHospital,
+  adminRejectHospital,
+  adminListMessages,
+  adminResolveMessage,
+  adminListDoctors,
+  adminCreateDoctor,
+  adminUpdateDoctor,
+  adminDeleteDoctor,
+  adminCreateHospital,
+  adminUpdateHospital,
+  adminDeleteHospital,
+  adminListDepartments,
+  adminCreateDepartment,
+  adminDeleteDepartment,
+  adminListFacilities,
+  adminCreateFacility,
+  adminDeleteFacility,
+} from "@/lib/admin.functions";
 
-export default AdminPage;
-
-
-
-function AdminPage() {
+export default function AdminPage() {
   const { user, loading } = useAuth();
-  const checkSelf = adminCheckSelf;
   const me = useQuery({
-    queryKey: ["admin", "self"],
-    queryFn: () => checkSelf(),
-    enabled: !!user
+    queryKey: ["admin", "self", user?.id || user?._id],
+    queryFn: () => adminCheckSelf(),
+    enabled: !!user,
   });
 
-  if (loading || user && me.isLoading)
-  return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
+  if (loading || (user && me.isLoading)) {
+    return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
+  }
 
-  if (!user) return <Gate title="Admin sign-in required" body="Please sign in with the admin account." cta={<Link to="/login"><Button>Go to login</Button></Link>} />;
-  if (!me.data?.isAdmin) return <Gate title="Admins only" body={`You're signed in as ${user.email}. This account doesn't have admin role.`} />;
+  if (!user) {
+    return (
+      <Gate
+        title="Admin sign-in required"
+        body="Please sign in with the admin account."
+        cta={
+          <Link to="/login">
+            <Button>Go to login</Button>
+          </Link>
+        }
+      />
+    );
+  }
+
+  const isUserAdmin = me.data?.isAdmin || user.role === "admin" || user.email?.toLowerCase() === "mediroutehealth@gmail.com";
+  if (!isUserAdmin) {
+    return <Gate title="Admins only" body={`You're signed in as ${user.email}. This account doesn't have admin role.`} />;
+  }
 
   return <AdminInner />;
 }
@@ -43,30 +81,34 @@ function AdminPage() {
 function Gate({ title, body, cta }) {
   return (
     <div className="max-w-md mx-auto px-4 py-20 text-center">
-      <div className="size-14 mx-auto rounded-2xl gradient-primary grid place-items-center text-primary-foreground mb-4"><Shield className="size-7" /></div>
+      <div className="size-14 mx-auto rounded-2xl gradient-primary grid place-items-center text-primary-foreground mb-4">
+        <Shield className="size-7" />
+      </div>
       <h1 className="font-display text-2xl font-bold">{title}</h1>
       <p className="text-muted-foreground mt-2">{body}</p>
       {cta && <div className="mt-6">{cta}</div>}
-    </div>);
-
+    </div>
+  );
 }
 
 const TABS = [
-{ id: "dashboard", label: "Dashboard", icon: BarChart3 },
-{ id: "hospitals", label: "Hospitals", icon: Building2 },
-{ id: "doctors", label: "Doctors", icon: Stethoscope },
-{ id: "departments", label: "Departments", icon: Layers },
-{ id: "facilities", label: "Facilities", icon: Wrench },
-{ id: "pending", label: "Pending", icon: Mail },
-{ id: "messages", label: "Messages", icon: Mail }];
-
+  { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+  { id: "hospitals", label: "Hospitals", icon: Building2 },
+  { id: "doctors", label: "Doctors", icon: Stethoscope },
+  { id: "departments", label: "Departments", icon: Layers },
+  { id: "facilities", label: "Facilities", icon: Wrench },
+  { id: "pending", label: "Pending", icon: Mail },
+  { id: "messages", label: "Messages", icon: Mail },
+];
 
 function AdminInner() {
   const [tab, setTab] = useState("dashboard");
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="flex items-center gap-3 mb-6">
-        <div className="size-12 rounded-2xl gradient-primary grid place-items-center text-primary-foreground"><Shield className="size-6" /></div>
+        <div className="size-12 rounded-2xl gradient-primary grid place-items-center text-primary-foreground">
+          <Shield className="size-6" />
+        </div>
         <div>
           <h1 className="font-display text-3xl font-bold">Admin</h1>
           <p className="text-muted-foreground text-sm">Manage hospitals, doctors, departments and facilities.</p>
@@ -78,11 +120,17 @@ function AdminInner() {
           const Icon = t.icon;
           const active = tab === t.id;
           return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-              <Icon className="size-4" />{t.label}
-            </button>);
-
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+                active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="size-4" />
+              {t.label}
+            </button>
+          );
         })}
       </div>
 
@@ -93,168 +141,227 @@ function AdminInner() {
       {tab === "facilities" && <FacilitiesTab />}
       {tab === "pending" && <PendingTab />}
       {tab === "messages" && <MessagesTab />}
-    </div>);
-
+    </div>
+  );
 }
 
 // ---------------- Dashboard ----------------
 function DashboardTab() {
-  const fn = adminAnalytics;
-  const { data, isLoading } = useQuery({ queryKey: ["admin", "analytics"], queryFn: () => fn() });
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "analytics"],
+    queryFn: () => adminAnalytics(),
+  });
+
   if (isLoading || !data) return <Skeleton />;
-  const c = data.counts;
+  const c = data.counts || {};
   const stats = [
-  { label: "Hospitals", v: c.hospitals }, { label: "Govt hospitals", v: c.govt_hospitals },
-  { label: "Doctors", v: c.doctors }, { label: "Appointments", v: c.appointments },
-  { label: "Departments", v: c.departments }, { label: "Facilities", v: c.facilities },
-  { label: "Pending submissions", v: c.pending_submissions }, { label: "Open messages", v: c.open_messages }];
+    { label: "Hospitals", v: c.hospitals ?? 0 },
+    { label: "Govt hospitals", v: c.govt_hospitals ?? 0 },
+    { label: "Doctors", v: c.doctors ?? 0 },
+    { label: "Appointments", v: c.appointments ?? 0 },
+    { label: "Departments", v: c.departments ?? 0 },
+    { label: "Facilities", v: c.facilities ?? 0 },
+    { label: "Pending submissions", v: c.pending_submissions ?? 0 },
+    { label: "Open messages", v: c.open_messages ?? 0 },
+  ];
 
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {stats.map((s) =>
-        <div key={s.label} className="p-4 rounded-xl bg-card border border-border">
+        {stats.map((s) => (
+          <div key={s.label} className="p-4 rounded-xl bg-card border border-border">
             <div className="text-xs text-muted-foreground">{s.label}</div>
             <div className="text-2xl font-bold mt-1">{s.v}</div>
           </div>
-        )}
+        ))}
       </div>
       <Section title="Top cities by hospital count">
-        {data.topCities.length === 0 ? <Empty>No data.</Empty> :
-        <div className="grid gap-2">
+        {!data.topCities || data.topCities.length === 0 ? (
+          <Empty>No city distribution data yet.</Empty>
+        ) : (
+          <div className="grid gap-2">
             {data.topCities.map(([city, n]) => {
-            const max = data.topCities[0][1];
-            return (
-              <div key={city} className="flex items-center gap-3">
-                  <div className="w-32 text-sm">{city}</div>
-                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full gradient-primary" style={{ width: `${n / max * 100}%` }} />
+              const max = data.topCities[0][1] || 1;
+              return (
+                <div key={city} className="flex items-center gap-3">
+                  <div className="w-32 text-sm font-medium">{city}</div>
+                  <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full gradient-primary" style={{ width: `${(n / max) * 100}%` }} />
                   </div>
                   <div className="w-10 text-right text-sm font-semibold">{n}</div>
-                </div>);
-
-          })}
+                </div>
+              );
+            })}
           </div>
-        }
+        )}
       </Section>
-    </div>);
-
+    </div>
+  );
 }
 
 // ---------------- Hospitals CRUD ----------------
 function HospitalsTab() {
   const qc = useQueryClient();
-  const create = adminCreateHospital;
-  const update = adminUpdateHospital;
-  const del = adminDeleteHospital;
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
 
   const { data: hospitals = [], isLoading } = useQuery({
     queryKey: ["admin", "hospitals"],
-    queryFn: async () => (await supabase.from("hospitals").select("*").order("name")).data ?? []
+    queryFn: async () => {
+      const res = await fetch("http://localhost:3001/api/hospitals");
+      if (!res.ok) return [];
+      return res.json();
+    },
   });
 
   const mDel = useMutation({
-    mutationFn: (id) => del({ data: { id } }),
-    onSuccess: () => {toast.success("Deleted");qc.invalidateQueries({ queryKey: ["admin", "hospitals"] });qc.invalidateQueries({ queryKey: ["hospitals"] });},
-    onError: (e) => toast.error(e?.message ?? "Failed")
+    mutationFn: (id) => adminDeleteHospital({ id }),
+    onSuccess: () => {
+      toast.success("Hospital deleted");
+      qc.invalidateQueries({ queryKey: ["admin", "hospitals"] });
+      qc.invalidateQueries({ queryKey: ["hospitals"] });
+    },
+    onError: (e) => toast.error(e?.message ?? "Failed"),
   });
 
   return (
     <div>
       <div className="flex justify-between items-center mb-3">
         <div className="text-sm text-muted-foreground">{hospitals.length} hospitals</div>
-        <Button size="sm" onClick={() => setCreating(true)}><Plus className="size-4 mr-1" />New hospital</Button>
+        <Button size="sm" onClick={() => setCreating(true)}>
+          <Plus className="size-4 mr-1" />
+          New hospital
+        </Button>
       </div>
-      {creating &&
-      <HospitalForm
-        onCancel={() => setCreating(false)}
-        onSubmit={async (v) => {
-          try {await create({ data: v });toast.success("Created");setCreating(false);qc.invalidateQueries({ queryKey: ["admin", "hospitals"] });qc.invalidateQueries({ queryKey: ["hospitals"] });}
-          catch (e) {toast.error(e?.message ?? "Failed");}
-        }} />
 
-      }
-      {isLoading ? <Skeleton /> :
-      <div className="grid gap-2">
-          {hospitals.map((h) =>
-        <div key={h.id} className="p-4 rounded-xl bg-card border border-border">
-              {editing?.id === h.id ?
-          <HospitalForm
-            initial={h}
-            onCancel={() => setEditing(null)}
-            onSubmit={async (v) => {
-              try {await update({ data: { id: h.id, patch: v } });toast.success("Saved");setEditing(null);qc.invalidateQueries({ queryKey: ["admin", "hospitals"] });qc.invalidateQueries({ queryKey: ["hospitals"] });}
-              catch (e) {toast.error(e?.message ?? "Failed");}
-            }} /> :
+      {creating && (
+        <HospitalForm
+          onCancel={() => setCreating(false)}
+          onSubmit={async (v) => {
+            try {
+              await adminCreateHospital(v);
+              toast.success("Hospital created");
+              setCreating(false);
+              qc.invalidateQueries({ queryKey: ["admin", "hospitals"] });
+              qc.invalidateQueries({ queryKey: ["hospitals"] });
+            } catch (e) {
+              toast.error(e?.message ?? "Failed");
+            }
+          }}
+        />
+      )}
 
-
-          <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-semibold">{h.name}</div>
-                    <div className="text-xs text-muted-foreground">{h.city}{h.address ? ` · ${h.address}` : ""}</div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {(h.specialties ?? []).slice(0, 5).map((s) => <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-muted">{s}</span>)}
+      {isLoading ? (
+        <Skeleton />
+      ) : (
+        <div className="grid gap-2">
+          {hospitals.map((h) => {
+            const hId = h.id || h._id;
+            return (
+              <div key={hId} className="p-4 rounded-xl bg-card border border-border">
+                {editing && (editing.id === hId || editing._id === hId) ? (
+                  <HospitalForm
+                    initial={h}
+                    onCancel={() => setEditing(null)}
+                    onSubmit={async (v) => {
+                      try {
+                        await adminUpdateHospital({ id: hId, patch: v });
+                        toast.success("Saved");
+                        setEditing(null);
+                        qc.invalidateQueries({ queryKey: ["admin", "hospitals"] });
+                        qc.invalidateQueries({ queryKey: ["hospitals"] });
+                      } catch (e) {
+                        toast.error(e?.message ?? "Failed");
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{h.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {h.city}
+                        {h.address ? ` · ${h.address}` : ""}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(h.specialties ?? []).slice(0, 5).map((s) => (
+                          <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-muted">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button size="sm" variant="outline" onClick={() => setEditing(h)}>
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (confirm(`Delete ${h.name}?`)) mDel.mutate(hId);
+                        }}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => setEditing(h)}><Pencil className="size-4" /></Button>
-                    <Button size="sm" variant="outline" onClick={() => {if (confirm(`Delete ${h.name}?`)) mDel.mutate(h.id);}}><Trash2 className="size-4" /></Button>
-                  </div>
-                </div>
-          }
-            </div>
-        )}
+                )}
+              </div>
+            );
+          })}
         </div>
-      }
-    </div>);
-
+      )}
+    </div>
+  );
 }
 
 function HospitalForm({ initial, onSubmit, onCancel }) {
   const [v, setV] = useState({
-    name: initial?.name ?? "", city: initial?.city ?? "", address: initial?.address ?? "", phone: initial?.phone ?? "",
+    name: initial?.name ?? "",
+    city: initial?.city ?? "",
+    address: initial?.address ?? "",
+    phone: initial?.phone ?? "",
     specialties: (initial?.specialties ?? []).join(", "),
-    emergency_24x7: initial?.emergency_24x7 ?? false, has_icu: initial?.has_icu ?? false,
-    has_mri: initial?.has_mri ?? false, has_ambulance: initial?.has_ambulance ?? false,
-    is_government: initial?.is_government ?? false, ayushman: initial?.ayushman ?? false,
-    lat: initial?.lat ?? "", lng: initial?.lng ?? "",
-    rating: initial?.rating ?? 4.0, cost_tier: initial?.cost_tier ?? "medium",
-    image_url: initial?.image_url ?? ""
+    emergency_24x7: initial?.emergency_24x7 ?? false,
+    has_icu: initial?.has_icu ?? false,
+    has_mri: initial?.has_mri ?? false,
+    has_ambulance: initial?.has_ambulance ?? false,
+    is_government: initial?.is_government ?? false,
+    ayushman: initial?.ayushman ?? false,
+    lat: initial?.lat ?? "",
+    lng: initial?.lng ?? "",
+    rating: initial?.rating ?? 4.0,
+    cost_tier: initial?.cost_tier ?? "medium",
+    image_url: initial?.image_url ?? "",
   });
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
-
-  const upload = async (file) => {
-    setUploading(true);
-    try {
-      const path = `${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, "_")}`;
-      const { error } = await supabase.storage.from("hospital-images").upload(path, file, { upsert: false });
-      if (error) throw error;
-      const { data } = supabase.storage.from("hospital-images").getPublicUrl(path);
-      setV((s) => ({ ...s, image_url: data.publicUrl }));
-      toast.success("Image uploaded");
-    } catch (e) {toast.error(e?.message ?? "Upload failed");} finally
-    {setUploading(false);}
-  };
 
   return (
-    <form onSubmit={async (e) => {
-      e.preventDefault();
-      setBusy(true);
-      try {
-        await onSubmit({
-          ...v,
-          specialties: v.specialties.split(",").map((s) => s.trim()).filter(Boolean),
-          lat: v.lat === "" ? null : Number(v.lat),
-          lng: v.lng === "" ? null : Number(v.lng),
-          rating: Number(v.rating),
-          image_url: v.image_url || null,
-          address: v.address || null, phone: v.phone || null
-        });
-      } finally {setBusy(false);}
-    }} className="grid gap-2 p-3 rounded-lg bg-muted/30">
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+          await onSubmit({
+            ...v,
+            specialties: v.specialties
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+            lat: v.lat === "" ? null : Number(v.lat),
+            lng: v.lng === "" ? null : Number(v.lng),
+            rating: Number(v.rating),
+            image_url: v.image_url || null,
+            address: v.address || null,
+            phone: v.phone || null,
+          });
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="grid gap-2 p-4 rounded-xl bg-muted/40 mb-4 border border-border"
+    >
       <div className="grid sm:grid-cols-2 gap-2">
         <Input label="Name *" value={v.name} onChange={(x) => setV((s) => ({ ...s, name: x }))} required />
         <Input label="City *" value={v.city} onChange={(x) => setV((s) => ({ ...s, city: x }))} required />
@@ -266,7 +373,7 @@ function HospitalForm({ initial, onSubmit, onCancel }) {
         <Select label="Cost tier" value={v.cost_tier} onChange={(x) => setV((s) => ({ ...s, cost_tier: x }))} options={["low", "medium", "high"]} />
       </div>
       <Input label="Specialties (comma separated)" value={v.specialties} onChange={(x) => setV((s) => ({ ...s, specialties: x }))} />
-      <div className="grid sm:grid-cols-3 gap-2 text-sm">
+      <div className="grid sm:grid-cols-3 gap-2 text-sm my-2">
         <Check label="24×7 Emergency" v={v.emergency_24x7} on={(x) => setV((s) => ({ ...s, emergency_24x7: x }))} />
         <Check label="ICU" v={v.has_icu} on={(x) => setV((s) => ({ ...s, has_icu: x }))} />
         <Check label="MRI" v={v.has_mri} on={(x) => setV((s) => ({ ...s, has_mri: x }))} />
@@ -274,106 +381,179 @@ function HospitalForm({ initial, onSubmit, onCancel }) {
         <Check label="Government" v={v.is_government} on={(x) => setV((s) => ({ ...s, is_government: x }))} />
         <Check label="Ayushman" v={v.ayushman} on={(x) => setV((s) => ({ ...s, ayushman: x }))} />
       </div>
-      <div>
-        <label className="text-xs font-medium text-muted-foreground">Image</label>
-        <div className="flex items-center gap-2 mt-1">
-          <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} className="text-sm" />
-          {uploading && <span className="text-xs">Uploading…</span>}
-          {v.image_url && <img src={v.image_url} alt="" className="size-12 rounded object-cover" />}
-        </div>
+      <Input label="Image URL" value={v.image_url} onChange={(x) => setV((s) => ({ ...s, image_url: x }))} />
+      <div className="flex gap-2 mt-2">
+        <Button type="submit" size="sm" disabled={busy}>
+          <Save className="size-4 mr-1" />
+          {busy ? "Saving…" : "Save"}
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          <X className="size-4 mr-1" />
+          Cancel
+        </Button>
       </div>
-      <div className="flex gap-2 mt-1">
-        <Button type="submit" size="sm" disabled={busy}><Save className="size-4 mr-1" />{busy ? "Saving…" : "Save"}</Button>
-        <Button type="button" size="sm" variant="outline" onClick={onCancel}><X className="size-4 mr-1" />Cancel</Button>
-      </div>
-    </form>);
-
+    </form>
+  );
 }
 
 // ---------------- Doctors CRUD ----------------
 function DoctorsTab() {
   const qc = useQueryClient();
-  const list = adminListDoctors;
-  const create = adminCreateDoctor;
-  const update = adminUpdateDoctor;
-  const del = adminDeleteDoctor;
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
-  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "doctors"], queryFn: () => list() });
-  const { data: hospitals = [] } = useQuery({ queryKey: ["hospitals", "brief"], queryFn: async () => (await supabase.from("hospitals").select("id,name").order("name")).data ?? [] });
+  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "doctors"], queryFn: () => adminListDoctors() });
+  const { data: hospitals = [] } = useQuery({
+    queryKey: ["hospitals", "brief"],
+    queryFn: async () => {
+      const res = await fetch("http://localhost:3001/api/hospitals");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
   const mDel = useMutation({
-    mutationFn: (id) => del({ data: { id } }),
-    onSuccess: () => {toast.success("Deleted");qc.invalidateQueries({ queryKey: ["admin", "doctors"] });},
-    onError: (e) => toast.error(e?.message ?? "Failed")
+    mutationFn: (id) => adminDeleteDoctor({ id }),
+    onSuccess: () => {
+      toast.success("Doctor deleted");
+      qc.invalidateQueries({ queryKey: ["admin", "doctors"] });
+    },
+    onError: (e) => toast.error(e?.message ?? "Failed"),
   });
 
   return (
     <div>
       <div className="flex justify-between items-center mb-3">
         <div className="text-sm text-muted-foreground">{data.length} doctors</div>
-        <Button size="sm" onClick={() => setCreating(true)}><Plus className="size-4 mr-1" />New doctor</Button>
+        <Button size="sm" onClick={() => setCreating(true)}>
+          <Plus className="size-4 mr-1" />
+          New doctor
+        </Button>
       </div>
-      {creating &&
-      <DoctorForm hospitals={hospitals} onCancel={() => setCreating(false)}
-      onSubmit={async (v) => {try {await create({ data: v });toast.success("Created");setCreating(false);qc.invalidateQueries({ queryKey: ["admin", "doctors"] });} catch (e) {toast.error(e?.message);}}} />
-      }
-      {isLoading ? <Skeleton /> :
-      <div className="grid gap-2">
-          {data.map((d) =>
-        <div key={d.id} className="p-4 rounded-xl bg-card border border-border">
-              {editing?.id === d.id ?
-          <DoctorForm initial={d} hospitals={hospitals} onCancel={() => setEditing(null)}
-          onSubmit={async (v) => {try {await update({ data: { id: d.id, patch: v } });toast.success("Saved");setEditing(null);qc.invalidateQueries({ queryKey: ["admin", "doctors"] });} catch (e) {toast.error(e?.message);}}} /> :
-
-          <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-semibold">Dr. {d.name}</div>
-                    <div className="text-xs text-muted-foreground">{d.specialization} · ₹{d.consultation_fee} · {d.experience_years}y exp</div>
+      {creating && (
+        <DoctorForm
+          hospitals={hospitals}
+          onCancel={() => setCreating(false)}
+          onSubmit={async (v) => {
+            try {
+              await adminCreateDoctor(v);
+              toast.success("Doctor created");
+              setCreating(false);
+              qc.invalidateQueries({ queryKey: ["admin", "doctors"] });
+            } catch (e) {
+              toast.error(e?.message);
+            }
+          }}
+        />
+      )}
+      {isLoading ? (
+        <Skeleton />
+      ) : (
+        <div className="grid gap-2">
+          {data.map((d) => {
+            const dId = d.id || d._id;
+            return (
+              <div key={dId} className="p-4 rounded-xl bg-card border border-border">
+                {editing && (editing.id === dId || editing._id === dId) ? (
+                  <DoctorForm
+                    initial={d}
+                    hospitals={hospitals}
+                    onCancel={() => setEditing(null)}
+                    onSubmit={async (v) => {
+                      try {
+                        await adminUpdateDoctor({ id: dId, patch: v });
+                        toast.success("Saved");
+                        setEditing(null);
+                        qc.invalidateQueries({ queryKey: ["admin", "doctors"] });
+                      } catch (e) {
+                        toast.error(e?.message);
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">Dr. {d.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {d.specialization} · ₹{d.consultation_fee} · {d.experience_years}y exp
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button size="sm" variant="outline" onClick={() => setEditing(d)}>
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => confirm(`Delete Dr. ${d.name}?`) && mDel.mutate(dId)}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => setEditing(d)}><Pencil className="size-4" /></Button>
-                    <Button size="sm" variant="outline" onClick={() => confirm(`Delete Dr. ${d.name}?`) && mDel.mutate(d.id)}><Trash2 className="size-4" /></Button>
-                  </div>
-                </div>
-          }
-            </div>
-        )}
+                )}
+              </div>
+            );
+          })}
         </div>
-      }
-    </div>);
-
+      )}
+    </div>
+  );
 }
 
 function DoctorForm({ initial, hospitals, onSubmit, onCancel }) {
   const [v, setV] = useState({
-    name: initial?.name ?? "", specialization: initial?.specialization ?? "",
-    hospital_id: initial?.hospital_id ?? "",
+    name: initial?.name ?? "",
+    specialization: initial?.specialization ?? "",
+    hospital_id: initial?.hospital_id || initial?.hospital?._id || initial?.hospital?.id || "",
     experience_years: initial?.experience_years ?? 5,
     consultation_fee: initial?.consultation_fee ?? 500,
     rating: initial?.rating ?? 4.5,
     timing: initial?.timing ?? "10:00 AM - 5:00 PM",
     available_days: (initial?.available_days ?? ["Mon", "Tue", "Wed", "Thu", "Fri"]).join(", "),
-    avatar_url: initial?.avatar_url ?? ""
+    avatar_url: initial?.avatar_url ?? "",
   });
   const [busy, setBusy] = useState(false);
+
   return (
-    <form onSubmit={async (e) => {e.preventDefault();setBusy(true);try {
-        await onSubmit({ ...v,
-          hospital_id: v.hospital_id || null,
-          experience_years: Number(v.experience_years), consultation_fee: Number(v.consultation_fee), rating: Number(v.rating),
-          available_days: v.available_days.split(",").map((s) => s.trim()).filter(Boolean),
-          avatar_url: v.avatar_url || null
-        });
-      } finally {setBusy(false);}}} className="grid gap-2 p-3 rounded-lg bg-muted/30">
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+          await onSubmit({
+            ...v,
+            hospital_id: v.hospital_id || null,
+            experience_years: Number(v.experience_years),
+            consultation_fee: Number(v.consultation_fee),
+            rating: Number(v.rating),
+            available_days: v.available_days
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+            avatar_url: v.avatar_url || null,
+          });
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="grid gap-2 p-4 rounded-xl bg-muted/40 mb-4 border border-border"
+    >
       <div className="grid sm:grid-cols-2 gap-2">
         <Input label="Name *" value={v.name} onChange={(x) => setV((s) => ({ ...s, name: x }))} required />
         <Input label="Specialization *" value={v.specialization} onChange={(x) => setV((s) => ({ ...s, specialization: x }))} required />
         <div>
           <label className="text-xs font-medium text-muted-foreground">Hospital</label>
-          <select value={v.hospital_id} onChange={(e) => setV((s) => ({ ...s, hospital_id: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1">
+          <select
+            value={v.hospital_id}
+            onChange={(e) => setV((s) => ({ ...s, hospital_id: e.target.value }))}
+            className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1 outline-none"
+          >
             <option value="">— None —</option>
-            {hospitals.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            {hospitals.map((h) => (
+              <option key={h.id || h._id} value={h.id || h._id}>
+                {h.name}
+              </option>
+            ))}
           </select>
         </div>
         <Input label="Experience (years)" value={String(v.experience_years)} onChange={(x) => setV((s) => ({ ...s, experience_years: x }))} />
@@ -382,24 +562,41 @@ function DoctorForm({ initial, hospitals, onSubmit, onCancel }) {
         <Input label="Timing" value={v.timing} onChange={(x) => setV((s) => ({ ...s, timing: x }))} />
         <Input label="Available days (comma)" value={v.available_days} onChange={(x) => setV((s) => ({ ...s, available_days: x }))} />
       </div>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={busy}><Save className="size-4 mr-1" />{busy ? "Saving…" : "Save"}</Button>
-        <Button type="button" size="sm" variant="outline" onClick={onCancel}><X className="size-4 mr-1" />Cancel</Button>
+      <div className="flex gap-2 mt-2">
+        <Button type="submit" size="sm" disabled={busy}>
+          <Save className="size-4 mr-1" />
+          {busy ? "Saving…" : "Save"}
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          <X className="size-4 mr-1" />
+          Cancel
+        </Button>
       </div>
-    </form>);
-
+    </form>
+  );
 }
 
 // ---------------- Departments ----------------
 function DepartmentsTab() {
   const qc = useQueryClient();
-  const list = adminListDepartments;
-  const create = adminCreateDepartment;
-  const del = adminDeleteDepartment;
   const [creating, setCreating] = useState(false);
-  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "departments"], queryFn: () => list() });
-  const { data: hospitals = [] } = useQuery({ queryKey: ["hospitals", "brief"], queryFn: async () => (await supabase.from("hospitals").select("id,name").order("name")).data ?? [] });
-  const mDel = useMutation({ mutationFn: (id) => del({ data: { id } }), onSuccess: () => {qc.invalidateQueries({ queryKey: ["admin", "departments"] });} });
+  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "departments"], queryFn: () => adminListDepartments() });
+  const { data: hospitals = [] } = useQuery({
+    queryKey: ["hospitals", "brief"],
+    queryFn: async () => {
+      const res = await fetch("http://localhost:3001/api/hospitals");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const mDel = useMutation({
+    mutationFn: (id) => adminDeleteDepartment({ id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "departments"] });
+    },
+  });
+
   return (
     <SimpleListPage
       label="department"
@@ -409,42 +606,78 @@ function DepartmentsTab() {
       onNew={() => setCreating(true)}
       onCancelNew={() => setCreating(false)}
       onDelete={(id) => mDel.mutate(id)}
-      renderItem={(d) => <><div className="font-semibold">{d.name}</div><div className="text-xs text-muted-foreground">{hospitals.find((h) => h.id === d.hospital_id)?.name ?? "All hospitals"} {d.head_doctor ? `· Head: ${d.head_doctor}` : ""}</div></>}
-      form={(close) =>
-      <SimpleForm
-        fields={[
-        { key: "name", label: "Name *", required: true },
-        { key: "head_doctor", label: "Head doctor" },
-        { key: "phone", label: "Phone" },
-        { key: "description", label: "Description" }]
-        }
-        extra={(state, set) =>
-        <div>
+      renderItem={(d) => (
+        <>
+          <div className="font-semibold">{d.name}</div>
+          <div className="text-xs text-muted-foreground">
+            {hospitals.find((h) => (h.id || h._id) === (d.hospital_id || d.hospital?._id || d.hospital?.id))?.name ?? "All hospitals"}{" "}
+            {d.head_doctor ? `· Head: ${d.head_doctor}` : ""}
+          </div>
+        </>
+      )}
+      form={(close) => (
+        <SimpleForm
+          fields={[
+            { key: "name", label: "Name *", required: true },
+            { key: "head_doctor", label: "Head doctor" },
+            { key: "phone", label: "Phone" },
+            { key: "description", label: "Description" },
+          ]}
+          extra={(state, set) => (
+            <div>
               <label className="text-xs font-medium text-muted-foreground">Hospital</label>
-              <select value={state.hospital_id ?? ""} onChange={(e) => set({ ...state, hospital_id: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1">
+              <select
+                value={state.hospital_id ?? ""}
+                onChange={(e) => set({ ...state, hospital_id: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1 outline-none"
+              >
                 <option value="">— All hospitals —</option>
-                {hospitals.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+                {hospitals.map((h) => (
+                  <option key={h.id || h._id} value={h.id || h._id}>
+                    {h.name}
+                  </option>
+                ))}
               </select>
             </div>
-        }
-        onSubmit={async (v) => {try {await create({ data: { ...v, hospital_id: v.hospital_id || null } });toast.success("Created");close();qc.invalidateQueries({ queryKey: ["admin", "departments"] });} catch (e) {toast.error(e?.message);}}}
-        onCancel={close} />
-
-      } />);
-
-
+          )}
+          onSubmit={async (v) => {
+            try {
+              await adminCreateDepartment({ ...v, hospital_id: v.hospital_id || null });
+              toast.success("Department created");
+              close();
+              qc.invalidateQueries({ queryKey: ["admin", "departments"] });
+            } catch (e) {
+              toast.error(e?.message);
+            }
+          }}
+          onCancel={close}
+        />
+      )}
+    />
+  );
 }
 
 // ---------------- Facilities ----------------
 function FacilitiesTab() {
   const qc = useQueryClient();
-  const list = adminListFacilities;
-  const create = adminCreateFacility;
-  const del = adminDeleteFacility;
   const [creating, setCreating] = useState(false);
-  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "facilities"], queryFn: () => list() });
-  const { data: hospitals = [] } = useQuery({ queryKey: ["hospitals", "brief"], queryFn: async () => (await supabase.from("hospitals").select("id,name").order("name")).data ?? [] });
-  const mDel = useMutation({ mutationFn: (id) => del({ data: { id } }), onSuccess: () => {qc.invalidateQueries({ queryKey: ["admin", "facilities"] });} });
+  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "facilities"], queryFn: () => adminListFacilities() });
+  const { data: hospitals = [] } = useQuery({
+    queryKey: ["hospitals", "brief"],
+    queryFn: async () => {
+      const res = await fetch("http://localhost:3001/api/hospitals");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const mDel = useMutation({
+    mutationFn: (id) => adminDeleteFacility({ id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "facilities"] });
+    },
+  });
+
   return (
     <SimpleListPage
       label="facility"
@@ -454,166 +687,309 @@ function FacilitiesTab() {
       onNew={() => setCreating(true)}
       onCancelNew={() => setCreating(false)}
       onDelete={(id) => mDel.mutate(id)}
-      renderItem={(f) => <><div className="font-semibold">{f.name} <span className="text-xs text-muted-foreground">({f.category})</span></div><div className="text-xs text-muted-foreground">{hospitals.find((h) => h.id === f.hospital_id)?.name ?? "All hospitals"} · {f.available ? "Available" : "Unavailable"}</div></>}
-      form={(close) =>
-      <SimpleForm
-        fields={[
-        { key: "name", label: "Name *", required: true },
-        { key: "category", label: "Category", default: "general" },
-        { key: "notes", label: "Notes" }]
-        }
-        extra={(state, set) =>
+      renderItem={(f) => (
         <>
+          <div className="font-semibold">
+            {f.name} <span className="text-xs text-muted-foreground">({f.category})</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {hospitals.find((h) => (h.id || h._id) === (f.hospital_id || f.hospital?._id || f.hospital?.id))?.name ?? "All hospitals"} ·{" "}
+            {f.available ? "Available" : "Unavailable"}
+          </div>
+        </>
+      )}
+      form={(close) => (
+        <SimpleForm
+          fields={[
+            { key: "name", label: "Name *", required: true },
+            { key: "category", label: "Category", default: "general" },
+            { key: "notes", label: "Notes" },
+          ]}
+          extra={(state, set) => (
+            <>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Hospital</label>
-                <select value={state.hospital_id ?? ""} onChange={(e) => set({ ...state, hospital_id: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1">
+                <select
+                  value={state.hospital_id ?? ""}
+                  onChange={(e) => set({ ...state, hospital_id: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1 outline-none"
+                >
                   <option value="">— All hospitals —</option>
-                  {hospitals.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  {hospitals.map((h) => (
+                    <option key={h.id || h._id} value={h.id || h._id}>
+                      {h.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <Check label="Available" v={state.available !== false} on={(x) => set({ ...state, available: x })} />
             </>
-        }
-        onSubmit={async (v) => {try {await create({ data: { ...v, hospital_id: v.hospital_id || null, available: v.available !== false } });toast.success("Created");close();qc.invalidateQueries({ queryKey: ["admin", "facilities"] });} catch (e) {toast.error(e?.message);}}}
-        onCancel={close} />
-
-      } />);
-
-
+          )}
+          onSubmit={async (v) => {
+            try {
+              await adminCreateFacility({ ...v, hospital_id: v.hospital_id || null, available: v.available !== false });
+              toast.success("Facility created");
+              close();
+              qc.invalidateQueries({ queryKey: ["admin", "facilities"] });
+            } catch (e) {
+              toast.error(e?.message);
+            }
+          }}
+          onCancel={close}
+        />
+      )}
+    />
+  );
 }
 
 // ---------------- Pending submissions ----------------
 function PendingTab() {
   const qc = useQueryClient();
-  const list = adminListPending;
-  const approve = adminApproveHospital;
-  const reject = adminRejectHospital;
-  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "pending"], queryFn: () => list() });
-  const mA = useMutation({ mutationFn: (id) => approve({ data: { id } }), onSuccess: () => {toast.success("Approved");qc.invalidateQueries({ queryKey: ["admin", "pending"] });qc.invalidateQueries({ queryKey: ["hospitals"] });} });
-  const mR = useMutation({ mutationFn: (id) => reject({ data: { id } }), onSuccess: () => {toast.success("Rejected");qc.invalidateQueries({ queryKey: ["admin", "pending"] });} });
+  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "pending"], queryFn: () => adminListPending() });
+  const mA = useMutation({
+    mutationFn: (id) => adminApproveHospital({ id }),
+    onSuccess: () => {
+      toast.success("Approved");
+      qc.invalidateQueries({ queryKey: ["admin", "pending"] });
+      qc.invalidateQueries({ queryKey: ["hospitals"] });
+    },
+  });
+  const mR = useMutation({
+    mutationFn: (id) => adminRejectHospital({ id }),
+    onSuccess: () => {
+      toast.success("Rejected");
+      qc.invalidateQueries({ queryKey: ["admin", "pending"] });
+    },
+  });
+
   const pendings = data.filter((p) => p.status === "pending");
   if (isLoading) return <Skeleton />;
   if (pendings.length === 0) return <Empty>No pending submissions.</Empty>;
+
   return (
     <div className="grid gap-3">
-      {pendings.map((p) =>
-      <div key={p.id} className="p-4 rounded-xl bg-card border border-border flex items-start justify-between gap-3">
-          <div>
-            <div className="font-semibold">{p.name}</div>
-            <div className="text-sm text-muted-foreground">{p.city}{p.address ? ` · ${p.address}` : ""}</div>
-            <div className="text-xs text-muted-foreground mt-1">By {p.submitter_email ?? p.submitted_by}</div>
+      {pendings.map((p) => {
+        const pId = p.id || p._id;
+        return (
+          <div key={pId} className="p-4 rounded-xl bg-card border border-border flex items-start justify-between gap-3 shadow-sm">
+            <div>
+              <div className="font-semibold">{p.name}</div>
+              <div className="text-sm text-muted-foreground">
+                {p.city}
+                {p.address ? ` · ${p.address}` : ""}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">By {p.submitter_email ?? p.submitted_by}</div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" onClick={() => mA.mutate(pId)}>
+                <CheckCircle2 className="size-4 mr-1" />
+                Approve
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => mR.mutate(pId)}>
+                <XCircle className="size-4 mr-1" />
+                Reject
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <Button size="sm" onClick={() => mA.mutate(p.id)}><CheckCircle2 className="size-4 mr-1" />Approve</Button>
-            <Button size="sm" variant="outline" onClick={() => mR.mutate(p.id)}><XCircle className="size-4 mr-1" />Reject</Button>
-          </div>
-        </div>
-      )}
-    </div>);
-
+        );
+      })}
+    </div>
+  );
 }
 
 // ---------------- Messages ----------------
 function MessagesTab() {
   const qc = useQueryClient();
-  const list = adminListMessages;
-  const resolve = adminResolveMessage;
-  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "messages"], queryFn: () => list() });
-  const mR = useMutation({ mutationFn: (v) => resolve({ data: v }), onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "messages"] }) });
+  const { data = [], isLoading } = useQuery({ queryKey: ["admin", "messages"], queryFn: () => adminListMessages() });
+  const mR = useMutation({
+    mutationFn: (v) => adminResolveMessage(v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "messages"] }),
+  });
+
   const open = data.filter((m) => !m.resolved);
   if (isLoading) return <Skeleton />;
   if (open.length === 0) return <Empty>No open messages.</Empty>;
+
   return (
     <div className="grid gap-3">
-      {open.map((m) =>
-      <div key={m.id} className="p-4 rounded-xl bg-card border border-border">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <div className="font-semibold">{m.subject || `(${m.category})`}</div>
-              <div className="text-xs text-muted-foreground">{m.name} &lt;{m.email}&gt; · {new Date(m.created_at).toLocaleString()}</div>
-              <p className="text-sm mt-2 whitespace-pre-wrap">{m.message}</p>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <a href={`mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject || "Your MediRoute message")}`} className="text-xs text-primary underline self-center">Reply</a>
-              <Button size="sm" variant="outline" onClick={() => mR.mutate({ id: m.id, resolved: true })}><MailOpen className="size-4 mr-1" />Resolve</Button>
+      {open.map((m) => {
+        const mId = m.id || m._id;
+        return (
+          <div key={mId} className="p-4 rounded-xl bg-card border border-border shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <div className="font-semibold">{m.subject || `(${m.category})`}</div>
+                <div className="text-xs text-muted-foreground">
+                  {m.name} &lt;{m.email}&gt; · {new Date(m.created_at || m.createdAt || Date.now()).toLocaleString()}
+                </div>
+                <p className="text-sm mt-2 whitespace-pre-wrap">{m.message}</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <a
+                  href={`mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject || "Your MediRoute message")}`}
+                  className="text-xs text-primary underline self-center"
+                >
+                  Reply
+                </a>
+                <Button size="sm" variant="outline" onClick={() => mR.mutate({ id: mId, resolved: true })}>
+                  <MailOpen className="size-4 mr-1" />
+                  Resolve
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>);
-
+        );
+      })}
+    </div>
+  );
 }
 
 // ---------------- Generic helpers ----------------
-function SimpleListPage({ label, items, isLoading, creating, onNew, onCancelNew, onDelete, renderItem, form
-
-}) {
+function SimpleListPage({ label, items, isLoading, creating, onNew, onCancelNew, onDelete, renderItem, form }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-3">
-        <div className="text-sm text-muted-foreground">{items.length} {label}{items.length === 1 ? "" : "s"}</div>
-        <Button size="sm" onClick={onNew}><Plus className="size-4 mr-1" />New {label}</Button>
+        <div className="text-sm text-muted-foreground">
+          {items.length} {label}
+          {items.length === 1 ? "" : "s"}
+        </div>
+        <Button size="sm" onClick={onNew}>
+          <Plus className="size-4 mr-1" />
+          New {label}
+        </Button>
       </div>
       {creating && form(onCancelNew)}
-      {isLoading ? <Skeleton /> :
-      <div className="grid gap-2">
-          {items.map((i) =>
-        <div key={i.id} className="p-4 rounded-xl bg-card border border-border flex items-center justify-between gap-3">
-              <div>{renderItem(i)}</div>
-              <Button size="sm" variant="outline" onClick={() => confirm(`Delete this ${label}?`) && onDelete(i.id)}><Trash2 className="size-4" /></Button>
-            </div>
-        )}
+      {isLoading ? (
+        <Skeleton />
+      ) : (
+        <div className="grid gap-2">
+          {items.map((i) => {
+            const iId = i.id || i._id;
+            return (
+              <div key={iId} className="p-4 rounded-xl bg-card border border-border flex items-center justify-between gap-3 shadow-sm">
+                <div>{renderItem(i)}</div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => confirm(`Delete this ${label}?`) && onDelete(iId)}
+                >
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </div>
+            );
+          })}
         </div>
-      }
-    </div>);
-
+      )}
+    </div>
+  );
 }
 
-function SimpleForm({ fields, extra, onSubmit, onCancel
-
-
-
-}) {
-  const init = {};fields.forEach((f) => init[f.key] = f.default ?? "");
+function SimpleForm({ fields, extra, onSubmit, onCancel }) {
+  const init = {};
+  fields.forEach((f) => (init[f.key] = f.default ?? ""));
   const [v, setV] = useState(init);
   const [busy, setBusy] = useState(false);
+
   return (
-    <form onSubmit={async (e) => {e.preventDefault();setBusy(true);try {await onSubmit(v);} finally {setBusy(false);}}} className="grid gap-2 p-3 rounded-lg bg-muted/30 mb-3">
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+          await onSubmit(v);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="grid gap-2 p-4 rounded-xl bg-muted/40 mb-4 border border-border"
+    >
       <div className="grid sm:grid-cols-2 gap-2">
-        {fields.map((f) => <Input key={f.key} label={f.label} value={v[f.key] ?? ""} onChange={(x) => setV((s) => ({ ...s, [f.key]: x }))} required={f.required} />)}
+        {fields.map((f) => (
+          <Input
+            key={f.key}
+            label={f.label}
+            value={v[f.key] ?? ""}
+            onChange={(x) => setV((s) => ({ ...s, [f.key]: x }))}
+            required={f.required}
+          />
+        ))}
       </div>
       {extra?.(v, setV)}
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={busy}><Save className="size-4 mr-1" />{busy ? "Saving…" : "Save"}</Button>
-        <Button type="button" size="sm" variant="outline" onClick={onCancel}><X className="size-4 mr-1" />Cancel</Button>
+      <div className="flex gap-2 mt-2">
+        <Button type="submit" size="sm" disabled={busy}>
+          <Save className="size-4 mr-1" />
+          {busy ? "Saving…" : "Save"}
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          <X className="size-4 mr-1" />
+          Cancel
+        </Button>
       </div>
-    </form>);
-
+    </form>
+  );
 }
 
 function Input({ label, value, onChange, required }) {
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
-      <input value={value} onChange={(e) => onChange(e.target.value)} required={required} className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1 outline-none focus:ring-2 focus:ring-primary/30" />
-    </div>);
-
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required={required}
+        className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1 outline-none focus:ring-2 focus:ring-primary/30"
+      />
+    </div>
+  );
 }
+
 function Select({ label, value, onChange, options }) {
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1">
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg bg-muted text-sm mt-1 outline-none"
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
       </select>
-    </div>);
+    </div>
+  );
+}
 
-}
 function Check({ label, v, on }) {
-  return <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={v} onChange={(e) => on(e.target.checked)} />{label}</label>;
+  return (
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input type="checkbox" checked={v} onChange={(e) => on(e.target.checked)} className="rounded accent-primary" />
+      {label}
+    </label>
+  );
 }
+
 function Section({ title, children }) {
-  return <section className="mb-6"><h2 className="font-display text-lg font-bold mb-2">{title}</h2><div className="p-4 rounded-xl bg-card border border-border">{children}</div></section>;
+  return (
+    <section className="mb-6">
+      <h2 className="font-display text-lg font-bold mb-2">{title}</h2>
+      <div className="p-4 rounded-xl bg-card border border-border shadow-soft">{children}</div>
+    </section>
+  );
 }
-function Empty({ children }) {return <div className="p-8 text-center text-sm text-muted-foreground bg-card border border-border rounded-xl">{children}</div>;}
-function Skeleton() {return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />)}</div>;}
+
+function Empty({ children }) {
+  return <div className="p-8 text-center text-sm text-muted-foreground bg-card border border-border rounded-xl">{children}</div>;
+}
+
+function Skeleton() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
+      ))}
+    </div>
+  );
+}

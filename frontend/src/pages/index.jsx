@@ -1,42 +1,45 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Search, Mic, Stethoscope, Bot, Siren, Droplet, Bed, Pill, Landmark, FileHeart, MapPin, Star, Languages, ShieldCheck, Activity, ArrowRight, Baby, Heart, Sparkles, Zap } from "lucide-react";
-// import heroImg from "@/assets/hero.jpg";
 import { Button } from "@/components/ui/button";
 
-export default Index;
-
-function Index() {
+export default function Index() {
   const nav = useNavigate();
   const [q, setQ] = useState("");
 
   const submit = (e) => {
     e.preventDefault();
     if (!q.trim()) return;
-    nav({ to: "/hospitals", search: { q } });
+    nav(`/hospitals?q=${encodeURIComponent(q.trim())}`);
   };
 
   const voice = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return alert("Voice search not supported in this browser.");
-    const r = new SR();r.lang = "en-IN";r.start();
-    r.onresult = (e) => {const t = e.results[0][0].transcript;setQ(t);nav({ to: "/hospitals", search: { q: t } });};
+    const r = new SR();
+    r.lang = "en-IN";
+    r.start();
+    r.onresult = (e) => {
+      const t = e.results[0][0].transcript;
+      setQ(t);
+      nav(`/hospitals?q=${encodeURIComponent(t)}`);
+    };
   };
 
   const features = [
-  { icon: Search, title: "Smart Search", desc: "Search by hospital, disease, symptom, doctor or location.", to: "/hospitals", color: "text-blue-500", bg: "bg-blue-500/10" },
-  { icon: MapPin, title: "Nearby Hospitals", desc: "Discover hospitals around you with travel time and directions.", to: "/hospitals", color: "text-emerald-500", bg: "bg-emerald-500/10" },
-  { icon: Siren, title: "Emergency SOS", desc: "Ambulance, blood, ER hospitals and helplines in one tap.", to: "/emergency", color: "text-rose-500", bg: "bg-rose-500/10" },
-  { icon: Stethoscope, title: "Specialization Filter", desc: "Find Cardiologists, Pediatricians, Dentists, and more.", to: "/doctors", color: "text-indigo-500", bg: "bg-indigo-500/10" },
-  { icon: Bot, title: "AI Symptom Assistant", desc: "Describe your symptoms — get triage guidance instantly.", to: "/ai-assistant", color: "text-purple-500", bg: "bg-purple-500/10" },
-  { icon: Bed, title: "Live Bed Availability", desc: "ICU, oxygen, emergency and general beds updated live.", to: "/hospitals", color: "text-cyan-500", bg: "bg-cyan-500/10" },
-  { icon: Droplet, title: "Blood Bank & Donors", desc: "Find blood by group and city. Become a donor to save lives.", to: "/blood-bank", color: "text-red-500", bg: "bg-red-500/10" },
-  { icon: Pill, title: "Medicine & Pharmacy", desc: "24x7 pharmacies and home delivery for emergency medicines.", to: "/pharmacy", color: "text-teal-500", bg: "bg-teal-500/10" },
-  { icon: Landmark, title: "Govt Schemes", desc: "Ayushman Bharat & free treatment programs information.", to: "/schemes", color: "text-amber-500", bg: "bg-amber-500/10" },
-  { icon: FileHeart, title: "Health Records", desc: "Store prescriptions and reports securely in one place.", to: "/records", color: "text-sky-500", bg: "bg-sky-500/10" },
-  { icon: Baby, title: "Women & Child", desc: "Maternity, pediatric and vaccination quick access.", to: "/hospitals", color: "text-pink-500", bg: "bg-pink-500/10" },
-  { icon: Languages, title: "Multilingual", desc: "Switch between English and हिन्दी anytime seamlessly.", to: "/", color: "text-orange-500", bg: "bg-orange-500/10" }];
-
+    { icon: Search, title: "Smart Search", desc: "Search by hospital, disease, symptom, doctor or location.", to: "/hospitals", color: "text-blue-500", bg: "bg-blue-500/10" },
+    { icon: MapPin, title: "Nearby Hospitals", desc: "Discover hospitals around you with travel time and directions.", to: "/nearby", color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { icon: Siren, title: "Emergency SOS", desc: "Ambulance, blood, ER hospitals and helplines in one tap.", to: "/emergency", color: "text-rose-500", bg: "bg-rose-500/10" },
+    { icon: Stethoscope, title: "Specialization Filter", desc: "Find Cardiologists, Pediatricians, Dentists, and more.", to: "/doctors", color: "text-indigo-500", bg: "bg-indigo-500/10" },
+    { icon: Bot, title: "AI Symptom Assistant", desc: "Describe your symptoms — get triage guidance instantly.", to: "/ai-assistant", color: "text-purple-500", bg: "bg-purple-500/10" },
+    { icon: Bed, title: "Live Bed Availability", desc: "ICU, oxygen, emergency and general beds updated live.", to: "/hospitals", color: "text-cyan-500", bg: "bg-cyan-500/10" },
+    { icon: Droplet, title: "Blood Bank & Donors", desc: "Find blood by group and city. Become a donor to save lives.", to: "/blood-bank", color: "text-red-500", bg: "bg-red-500/10" },
+    { icon: Pill, title: "Medicine & Pharmacy", desc: "24x7 pharmacies and home delivery for emergency medicines.", to: "/pharmacy", color: "text-teal-500", bg: "bg-teal-500/10" },
+    { icon: Landmark, title: "Govt Schemes", desc: "Ayushman Bharat & free treatment programs information.", to: "/schemes", color: "text-amber-500", bg: "bg-amber-500/10" },
+    { icon: FileHeart, title: "Health Records", desc: "Store prescriptions and reports securely in one place.", to: "/records", color: "text-sky-500", bg: "bg-sky-500/10" },
+    { icon: Baby, title: "Women & Child", desc: "Maternity, pediatric and vaccination quick access.", to: "/hospitals", color: "text-pink-500", bg: "bg-pink-500/10" },
+    { icon: Languages, title: "Multilingual", desc: "Switch between English and हिन्दी anytime seamlessly.", to: "/", color: "text-orange-500", bg: "bg-orange-500/10" },
+  ];
 
   return (
     <div className="overflow-x-hidden">
@@ -63,10 +66,11 @@ function Index() {
             <form onSubmit={submit} className="relative flex items-center p-2 sm:p-3 bg-background/80 backdrop-blur-xl border border-border rounded-2xl sm:rounded-full shadow-glow max-w-3xl animate-in fade-in slide-in-from-bottom-10 duration-700 delay-300 group focus-within:border-primary/50 transition-colors">
               <Search className="size-6 text-primary ml-4 mr-3" />
               <input
-                value={q} onChange={(e) => setQ(e.target.value)}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
                 placeholder="Search 'Cardiologist', 'ICU bed in Mumbai', 'Chest pain'..."
-                className="flex-1 bg-transparent outline-none text-lg placeholder:text-muted-foreground/70 font-medium" />
-              
+                className="flex-1 bg-transparent outline-none text-lg placeholder:text-muted-foreground/70 font-medium"
+              />
               <div className="flex items-center gap-2 pr-2">
                 <button type="button" onClick={voice} className="p-3 rounded-full hover:bg-muted text-muted-foreground transition-colors group-focus-within:text-primary" aria-label="Voice search">
                   <Mic className="size-5" />
@@ -77,11 +81,11 @@ function Index() {
 
             <div className="mt-8 flex flex-wrap gap-2 text-sm animate-in fade-in duration-700 delay-500">
               <span className="text-muted-foreground font-medium py-2 mr-2">Trending:</span>
-              {["Chest pain", "Pediatrician", "Dentist Bengaluru", "ICU bed", "Blood O+"].map((s) =>
-              <button key={s} onClick={() => nav({ to: "/hospitals", search: { q: s } })} className="px-4 py-2 rounded-full border border-border/60 bg-card/50 hover:bg-primary/10 hover:border-primary/30 hover:text-primary text-muted-foreground font-medium transition-all hover-lift">
+              {["Chest pain", "Pediatrician", "Dentist Bengaluru", "ICU bed", "Blood O+"].map((s) => (
+                <button key={s} onClick={() => nav(`/hospitals?q=${encodeURIComponent(s)}`)} className="px-4 py-2 rounded-full border border-border/60 bg-card/50 hover:bg-primary/10 hover:border-primary/30 hover:text-primary text-muted-foreground font-medium transition-all hover-lift">
                   {s}
                 </button>
-              )}
+              ))}
             </div>
 
             <div className="mt-12 flex flex-wrap gap-4 animate-in fade-in duration-700 delay-700">
@@ -133,11 +137,11 @@ function Index() {
           </div>
           
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {features.map((f, i) => {
+            {features.map((f) => {
               const Icon = f.icon;
               return (
                 <Link key={f.title} to={f.to} className="group relative p-6 rounded-3xl bg-card border border-border/50 hover:border-primary/50 shadow-sm hover:shadow-soft transition-all duration-300 hover-lift overflow-hidden">
-                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full -mr-16 -mt-16 transition-transform group-hover:scale-110`} />
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
                   <div className={`size-14 rounded-2xl ${f.bg} grid place-items-center mb-6 shadow-inner`}>
                     <Icon className={`size-7 ${f.color}`} />
                   </div>
@@ -146,8 +150,8 @@ function Index() {
                     <ArrowRight className="size-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
                   </h3>
                   <p className="text-sm text-muted-foreground font-medium leading-relaxed">{f.desc}</p>
-                </Link>);
-
+                </Link>
+              );
             })}
           </div>
         </div>
@@ -162,10 +166,10 @@ function Index() {
             
             <div className="space-y-6">
               {[
-              { icon: ShieldCheck, t: "100% Verified Directory", d: "Every hospital and doctor is rigorously vetted and verified." },
-              { icon: Activity, t: "Real-time Data Integration", d: "Live syncing with hospital APIs for accurate bed and blood availability." },
-              { icon: Heart, t: "Patient-First Design", d: "Zero clutter. Built specifically for high-stress, urgent situations." }].
-              map((x) => {
+                { icon: ShieldCheck, t: "100% Verified Directory", d: "Every hospital and doctor is rigorously vetted and verified." },
+                { icon: Activity, t: "Real-time Data Integration", d: "Live syncing with hospital APIs for accurate bed and blood availability." },
+                { icon: Heart, t: "Patient-First Design", d: "Zero clutter. Built specifically for high-stress, urgent situations." },
+              ].map((x) => {
                 const Icon = x.icon;
                 return (
                   <div key={x.t} className="flex gap-4 p-4 rounded-2xl hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50">
@@ -174,8 +178,8 @@ function Index() {
                       <div className="font-bold text-foreground text-lg">{x.t}</div>
                       <div className="text-muted-foreground mt-1">{x.d}</div>
                     </div>
-                  </div>);
-
+                  </div>
+                );
               })}
             </div>
           </div>
@@ -204,6 +208,6 @@ function Index() {
           </div>
         </div>
       </section>
-    </div>);
-
+    </div>
+  );
 }
