@@ -54,12 +54,12 @@ export default function Index() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm font-semibold text-primary mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <Sparkles className="size-4 animate-pulse" /> The Next-Gen Healthcare Platform
             </div>
-            <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.1] tracking-tight mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+            <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight tracking-tight mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
               Find care, <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">faster.</span>
               <br />
-              <span className="text-muted-foreground/80 font-semibold text-4xl sm:text-5xl lg:text-6xl">When seconds matter.</span>
+              <span className="text-muted-foreground/80 font-semibold text-2xl sm:text-3xl lg:text-4xl">When seconds matter.</span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl leading-relaxed mb-10 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+            <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed mb-10 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
               MediRoute connects you to the right hospitals, top doctors, live bed availability, and emergency services instantly. Your lifeline in a crisis.
             </p>
 
@@ -69,7 +69,7 @@ export default function Index() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search 'Cardiologist', 'ICU bed in Mumbai', 'Chest pain'..."
-                className="flex-1 bg-transparent outline-none text-lg placeholder:text-muted-foreground/70 font-medium"
+                className="flex-1 bg-transparent outline-none text-base placeholder:text-muted-foreground/70 font-medium"
               />
               <div className="flex items-center gap-2 pr-2">
                 <button type="button" onClick={voice} className="p-3 rounded-full hover:bg-muted text-muted-foreground transition-colors group-focus-within:text-primary" aria-label="Voice search">
@@ -79,10 +79,10 @@ export default function Index() {
               </div>
             </form>
 
-            <div className="mt-8 flex flex-wrap gap-2 text-sm animate-in fade-in duration-700 delay-500">
-              <span className="text-muted-foreground font-medium py-2 mr-2">Trending:</span>
+            <div className="mt-8 flex flex-wrap items-center gap-2 text-base animate-in fade-in duration-700 delay-500">
+              <span className="text-muted-foreground font-medium py-1.5 mr-2">Trending:</span>
               {["Chest pain", "Pediatrician", "Dentist Bengaluru", "ICU bed", "Blood O+"].map((s) => (
-                <button key={s} onClick={() => nav(`/hospitals?q=${encodeURIComponent(s)}`)} className="px-4 py-2 rounded-full border border-border/60 bg-card/50 hover:bg-primary/10 hover:border-primary/30 hover:text-primary text-muted-foreground font-medium transition-all hover-lift">
+                <button key={s} onClick={() => nav(`/hospitals?q=${encodeURIComponent(s)}`)} className="px-4 py-1.5 rounded-full border border-border/60 bg-card/50 hover:bg-primary/10 hover:border-primary/30 hover:text-primary text-muted-foreground font-medium text-base transition-all hover-lift">
                   {s}
                 </button>
               ))}
